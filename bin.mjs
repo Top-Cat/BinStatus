@@ -58,7 +58,10 @@ export default {
             },
             commandsResponse: {},
         }),
-        binTimes()
+        binTimes(),
+        m.battery({
+            voltage: true
+        })
     ],
     ota: true
 };

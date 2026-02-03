@@ -29,5 +29,8 @@
 #define E_SCL_PIN   GPIO_NUM_21
 #define E_SDA_PIN   GPIO_NUM_19
 
+#define BAT_LOW_PIN GPIO_NUM_2
+#define BAT_ADC_PIN GPIO_NUM_3
+
 #define BUTTON_PIN  GPIO_NUM_9
 #define ACK_PIN     GPIO_NUM_0

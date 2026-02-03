@@ -60,9 +60,8 @@ void ZigbeeSensor::createCustomClusters(esp_zb_cluster_list_t* cluster_list) {
 }
 
 void ZigbeeSensor::createPowerCluster(esp_zb_cluster_list_t* cluster_list) {
-    // TODO: Read values from GPIO
-    uint8_t battery_percentage = 50;
-    uint8_t battery_voltage = 37;
+    uint8_t battery_percentage = 0xff;
+    uint8_t battery_voltage = 0xff;
 
     esp_zb_attribute_list_t *power_config_cluster = esp_zb_zcl_attr_list_create(ESP_ZB_ZCL_CLUSTER_ID_POWER_CONFIG);
     esp_zb_power_config_cluster_add_attr(power_config_cluster, ESP_ZB_ZCL_ATTR_POWER_CONFIG_BATTERY_PERCENTAGE_REMAINING_ID, (void *)&battery_percentage);
@@ -155,6 +154,27 @@ void ZigbeeSensor::zbCustomCommand(const esp_zb_zcl_custom_cluster_command_messa
     return;
 }
 
+void ZigbeeSensor::setBattery(uint8_t battery) {
+    uint8_t percentage = battery * 4.5;
+    esp_zb_zcl_set_attribute_val(
+        _endpoint,
+        ESP_ZB_ZCL_CLUSTER_ID_POWER_CONFIG,
+        ESP_ZB_ZCL_CLUSTER_SERVER_ROLE,
+        ESP_ZB_ZCL_ATTR_POWER_CONFIG_BATTERY_PERCENTAGE_REMAINING_ID,
+        &percentage,
+        false
+    );
+
+    esp_zb_zcl_set_attribute_val(
+        _endpoint,
+        ESP_ZB_ZCL_CLUSTER_ID_POWER_CONFIG,
+        ESP_ZB_ZCL_CLUSTER_SERVER_ROLE,
+        ESP_ZB_ZCL_ATTR_POWER_CONFIG_BATTERY_VOLTAGE_ID,
+        &battery,
+        false
+    );
+}
+
 void ZigbeeSensor::onBinUpdate(void (*callback)(time_t, time_t, time_t)) {
     _on_bin_update = callback;
 }
@@ -222,7 +242,8 @@ esp_err_t doReport(uint8_t _endpoint, esp_zb_zcl_cluster_id_t cluster, uint16_t 
 
 bool ZigbeeSensor::report() {
     esp_zb_lock_acquire(portMAX_DELAY);
-    esp_err_t ret = doReport(_endpoint, ESP_ZB_ZCL_CLUSTER_ID_POWER_CONFIG, ESP_ZB_ZCL_ATTR_POWER_CONFIG_BATTERY_PERCENTAGE_REMAINING_ID);
+    esp_err_t ret = doReport(_endpoint, ESP_ZB_ZCL_CLUSTER_ID_POWER_CONFIG, ESP_ZB_ZCL_ATTR_POWER_CONFIG_BATTERY_PERCENTAGE_REMAINING_ID) |
+        doReport(_endpoint, ESP_ZB_ZCL_CLUSTER_ID_POWER_CONFIG, ESP_ZB_ZCL_ATTR_POWER_CONFIG_BATTERY_VOLTAGE_ID);
     esp_zb_lock_release();
 
     return ret == ESP_OK;

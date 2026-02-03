@@ -7,15 +7,6 @@
 
 #define MS_BIN_CLUSTER_ID        0xFC12
 #define CMD_SET_DISPLAY_TIMES    0x01
-/*#define ATTR_AMBER_LEVEL_ID      0x0001
-#define ATTR_WARM_WHITE_LEVEL_ID 0x0002
-#define ATTR_COOL_WHITE_LEVEL_ID 0x0003
-#define ATTR_LED_COUNT_ID        0x0010
-#define ATTR_ANIMATION_ID        0x0011
-#define ATTR_SPEED_ID            0x0012
-
-#define MS_LUX_CLUSTER_ID         0xFC11
-#define ATTR_INHIBIT_THRESHOLD_ID 0x0001*/
 
 #define OTA_UPGRADE_QUERY_INTERVAL (1 * 60)
 #define NVS_NAMESPACE         "config"
@@ -37,6 +28,7 @@ class ZigbeeSensor : public ZigbeeDevice {
         void zbCustomCommand(const esp_zb_zcl_custom_cluster_command_message_t *message) override;
 
         void init();
+        void setBattery(uint8_t battery);
 
         void onConnect();
         void onBinUpdate(void (*callback)(time_t, time_t, time_t));

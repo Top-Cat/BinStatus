@@ -26,11 +26,11 @@ class DisplayDriver {
         lv_display_t *disp;
         SemaphoreHandle_t lvgl_mux = NULL;
 
-        // lv_obj_t *counter_label = NULL;
-        uint16_t counter = 0;
+        Bins bins[3];
+        time_t times[3];
+
         uint8_t margin = 8;
         lv_point_precise_t line_points[4];
-
 
         // UI
         lv_obj_t* imgs[3];
@@ -39,6 +39,7 @@ class DisplayDriver {
         lv_obj_t* nextHead;
 
         void createUi();
+        void updateUi();
         void drawRow(Bins bin, uint8_t row, time_t when);
 };
 

@@ -32,11 +32,6 @@ void DisplayDriver::drawRow(Bins bin, uint8_t row, time_t when) {
     lv_obj_t *scr = lv_screen_active();
     uint8_t offset = 93 + (row * 75);
 
-    time_t now;
-    time(&now);
-    uint16_t until = ((when - now) / 86400) + 1;
-    tm* ti = localtime(&when);
-
     // Separator line
     lv_point_precise_t* lp = &line_points[row * 2];
     lp[0] = {8, offset};
@@ -48,18 +43,13 @@ void DisplayDriver::drawRow(Bins bin, uint8_t row, time_t when) {
     lv_obj_set_style_line_color(line, lv_color_black(), 0);
 
     imgs[row + 1] = lv_image_create(scr);
-    lv_image_set_src(imgs[row + 1], binImg[bin]);
-    lv_image_set_pivot(imgs[row + 1], imagePivot[bin], 0);
-    lv_image_set_scale(imgs[row + 1], imageScale[bin + 3]);
     lv_obj_align(imgs[row + 1], LV_ALIGN_TOP_LEFT, 30, offset + 17);
 
     infoText[row + 1] = lv_label_create(scr);
-    lv_label_set_text_fmt(infoText[row + 1], "%s on %02d/%02d/%04d", binName[bin], ti->tm_mday, ti->tm_mon + 1, ti->tm_year + 1900);
     lv_obj_set_style_text_font(infoText[row + 1], &lv_font_montserrat_20, 0);
     lv_obj_align(infoText[row + 1], LV_ALIGN_TOP_LEFT, 100, offset + 27);
 
     dayText[row + 1] = lv_label_create(scr);
-    lv_label_set_text_fmt(dayText[row + 1], "[%d]", until);
     lv_obj_set_style_text_font(dayText[row + 1], &lv_font_montserrat_20, 0);
     lv_obj_align(dayText[row + 1], LV_ALIGN_TOP_RIGHT, -30, offset + 27);
 }
@@ -69,23 +59,17 @@ void DisplayDriver::createUi() {
     lv_obj_set_style_bg_color(scr, lv_color_white(), 0);
 
     imgs[0] = lv_image_create(scr);
-    lv_image_set_src(imgs[0], &trash);
-    lv_image_set_pivot(imgs[0], 9, 0);
-    lv_image_set_scale(imgs[0], 750);
     lv_obj_align(imgs[0], LV_ALIGN_TOP_LEFT, 30, 15);
 
     nextHead = lv_label_create(scr);
-    lv_label_set_text(nextHead, "Next collection: BLACK");
     lv_obj_set_style_text_font(nextHead, &lv_font_montserrat_20, 0);
     lv_obj_align(nextHead, LV_ALIGN_TOP_LEFT, 90, 20);
 
     infoText[0] = lv_label_create(scr);
-    lv_label_set_text(infoText[0], "On 01/01/2026");
     lv_obj_set_style_text_font(infoText[0], &lv_font_montserrat_14, 0);
     lv_obj_align(infoText[0], LV_ALIGN_TOP_LEFT, 100, 50);
 
     dayText[0] = lv_label_create(scr);
-    lv_label_set_text(dayText[0], "5");
     lv_obj_set_style_text_font(dayText[0], &lv_font_montserrat_48, 0);
     lv_obj_align(dayText[0], LV_ALIGN_TOP_RIGHT, -30, 10);
 
@@ -94,13 +78,8 @@ void DisplayDriver::createUi() {
     lv_obj_set_style_text_font(daysLabel, &lv_font_montserrat_14, 0);
     lv_obj_align(daysLabel, LV_ALIGN_TOP_RIGHT, -30, 55);
 
-    time_t now;
-    time(&now);
-    time_t greenTime = now + 604799;
-    time_t brownTime = now + 777599;
-
-    drawRow(GREEN, 0, greenTime);
-    drawRow(BROWN, 1, brownTime);
+    drawRow(GREEN, 0, 0);
+    drawRow(BROWN, 1, 0);
 }
 
 void DisplayDriver::init() {
@@ -158,37 +137,49 @@ void DisplayDriver::init() {
 }
 
 void DisplayDriver::render() {
+    updateUi();
     lv_timer_handler(); // Ensure screen is updated
 
-    counter++;
-
     if (lock(100)) {
-        if (counter % 5 == 0) {
-            printf("Full refresh to clear ghosting\n");
-            epd_lvgl_force_full_refresh(disp);
-        }
-
         epd_lvgl_refresh(disp);
         unlock();
     }
 }
 
-void DisplayDriver::updateTimes(time_t black, time_t green, time_t brown) {
+void DisplayDriver::updateUi() {
     time_t now;
     time(&now);
 
-    printf("updateTimes %llu, %llu, %llu, %llu\n", now, black, green, brown);
+    if (!imgs[0] || !lock(1000)) return;
 
-    uint16_t dayCounts[] = {
-        static_cast<uint16_t>(((black - now) / 86400) + 1),
-        static_cast<uint16_t>(((green - now) / 86400) + 1),
-        static_cast<uint16_t>(((brown - now) / 86400) + 1)
-    };
+    for (uint8_t i = 0; i < 3; i++) {
+        uint16_t dayCount = ((times[i] - now) / 86400) + 1;
 
-    printf("dayCounts %d, %d, %d\n", dayCounts[0], dayCounts[1], dayCounts[2]);
+        lv_image_set_src(imgs[i], binImg[bins[i]]);
+        lv_image_set_pivot(imgs[i], imagePivot[bins[i]], 0);
+        lv_image_set_scale(imgs[i], imageScale[bins[i] + (i == 0 ? 0 : 3)]);
 
-    Bins bins[]  = {Bins::BLACK, Bins::GREEN, Bins::BROWN};
-    time_t times[] = {black, green, brown};
+        tm* ti = localtime(&times[i]);
+        if (i == 0) {
+            lv_label_set_text_fmt(dayText[i], "%d", dayCount);
+            lv_label_set_text_fmt(infoText[i], "On %02d/%02d/%04d", ti->tm_mday, ti->tm_mon + 1, ti->tm_year + 1900);
+            lv_label_set_text_fmt(nextHead, "Next collection: %s", binName[bins[i]]);
+        } else {
+            lv_label_set_text_fmt(dayText[i], "[%d]", dayCount);
+            lv_label_set_text_fmt(infoText[i], "%s on %02d/%02d/%04d", binName[bins[i]], ti->tm_mday, ti->tm_mon + 1, ti->tm_year + 1900);
+        }
+    }
+
+    unlock();
+}
+
+void DisplayDriver::updateTimes(time_t black, time_t green, time_t brown) {
+    bins[0] = Bins::BLACK;
+    bins[1] = Bins::GREEN;
+    bins[2] = Bins::BROWN;
+    times[0] = black;
+    times[1] = green;
+    times[2] = brown;
 
     for (uint8_t i = 0; i < 2; ++i) {
         for (uint8_t j = i+1; j < 3; ++j) {
@@ -198,26 +189,6 @@ void DisplayDriver::updateTimes(time_t black, time_t green, time_t brown) {
             }
         }
     }
-
-    if (!imgs[0] || !lock(1000)) return;
-
-    for (uint8_t i = 0; i < 3; i++) {
-        lv_image_set_src(imgs[i], binImg[bins[i]]);
-        lv_image_set_pivot(imgs[i], imagePivot[bins[i]], 0);
-        lv_image_set_scale(imgs[i], imageScale[bins[i] + (i == 0 ? 0 : 3)]);
-
-        tm* ti = localtime(&times[i]);
-        if (i == 0) {
-            lv_label_set_text_fmt(dayText[i], "%d", dayCounts[bins[i]]);
-            lv_label_set_text_fmt(infoText[i], "On %02d/%02d/%04d", ti->tm_mday, ti->tm_mon + 1, ti->tm_year + 1900);
-            lv_label_set_text_fmt(nextHead, "Next collection: %s", binName[bins[i]]);
-        } else {
-            lv_label_set_text_fmt(dayText[i], "[%d]", dayCounts[bins[i]]);
-            lv_label_set_text_fmt(infoText[i], "%s on %02d/%02d/%04d", binName[bins[i]], ti->tm_mday, ti->tm_mon + 1, ti->tm_year + 1900);
-        }
-    }
-
-    unlock();
 }
 
 DisplayDriver eink;
