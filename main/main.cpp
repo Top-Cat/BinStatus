@@ -10,15 +10,12 @@
 #include "ha/esp_zigbee_ha_standard.h"
 #include "nvs_flash.h"
 
-#include "esp_adc/adc_oneshot.h"
-#include "esp_adc/adc_cali.h"
-
 #include "config.h"
 #include "display.h"
 #include "sensor.h"
+#include "adc.h"
 #include "zigbee/handlers.h"
 #include "zigbee/core.h"
-
 
 ////////////////////////
 
@@ -28,9 +25,7 @@ static QueueHandle_t main_task_queue;
 volatile bool button_pressed = false;
 
 // TODO: Move epaper driver into project
-// TODO: Move ADC to own class
-static adc_oneshot_unit_handle_t adc_handle;
-static adc_cali_handle_t cali_handle = NULL;
+// TODO: Only init screen when ready to draw
 uint64_t lastHeartbeat = 0;
 uint16_t heartbeatCounter = 0;
 
@@ -166,18 +161,11 @@ void handleHeartbeat() {
 
     if (heartbeatCounter % 60 == 0) {
         // Every hour
-        gpio_set_direction(BAT_LOW_PIN, GPIO_MODE_OUTPUT);
-        gpio_set_level(BAT_LOW_PIN, 0);
-
-        vTaskDelay(100 / portTICK_PERIOD_MS);
-
-        int adcValue;
-        if (adc_oneshot_get_calibrated_result(adc_handle, cali_handle, (adc_channel_t) BAT_ADC_PIN, &adcValue) == ESP_OK) {
-            uint8_t zigbeeMv = ((adcValue * 3) + 50) / 100; // + 50 makes rounding correct
-            ESP_LOGV(TAG, "ADC result = %d -> %d", adcValue, zigbeeMv);
+        uint8_t zigbeeMv;
+        if (adc.getValue(zigbeeMv)) {
+            ESP_LOGV(TAG, "ADC result = %d", zigbeeMv);
             zbEndpoint.setBattery(zigbeeMv);
         }
-        gpio_set_direction(BAT_LOW_PIN, GPIO_MODE_INPUT);
     }
 
     if (heartbeatCounter % 360 == 0) {
@@ -210,29 +198,6 @@ void binUpdate(time_t black, time_t green, time_t brown) {
     eink.render();
 }
 
-void initADC() {
-    adc_oneshot_unit_init_cfg_t init_config = {
-        .unit_id = ADC_UNIT_1,
-        .clk_src = (adc_oneshot_clk_src_t) 0,
-        .ulp_mode = ADC_ULP_MODE_DISABLE
-    };
-    ESP_ERROR_CHECK(adc_oneshot_new_unit(&init_config, &adc_handle));
-
-    adc_oneshot_chan_cfg_t config = {
-        .atten = ADC_ATTEN_DB_12,
-        .bitwidth = ADC_BITWIDTH_12
-    };
-    ESP_ERROR_CHECK(adc_oneshot_config_channel(adc_handle, (adc_channel_t) BAT_ADC_PIN, &config));
-
-    adc_cali_curve_fitting_config_t cali_cfg = {
-        .unit_id = ADC_UNIT_1,
-        .chan = ADC_CHANNEL_3,
-        .atten = ADC_ATTEN_DB_12,
-        .bitwidth = ADC_BITWIDTH_12
-    };
-    ESP_ERROR_CHECK(adc_cali_create_scheme_curve_fitting(&cali_cfg, &cali_handle));
-}
-
 static esp_err_t esp_zb_power_save_init(void)
 {
     int cur_cpu_freq_mhz = CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ;
@@ -255,7 +220,7 @@ extern "C" void app_main(void) {
         .intr_type = GPIO_INTR_ANYEDGE
     };
     gpio_config(&gpioConfig);
-    initADC();
+    adc.init();
 
     gpio_install_isr_service(0);
     gpio_isr_handler_add(BUTTON_PIN, buttonISR, NULL);
