@@ -28,7 +28,7 @@ class ZigbeeSensor : public ZigbeeDevice {
         void zbCustomCommand(const esp_zb_zcl_custom_cluster_command_message_t *message) override;
 
         void init();
-        void setBattery(uint8_t battery);
+        void setBattery(uint8_t battery, uint8_t percentage);
 
         void onConnect();
         void onBinUpdate(void (*callback)(bool, time_t, time_t, time_t));

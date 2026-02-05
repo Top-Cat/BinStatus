@@ -98,13 +98,12 @@ void DisplayDriver::render() {
     updateUi();
     lv_timer_handler(); // Ensure screen is updated
 
-    epaper.setPower(true);
+    epaper.power();
     if (lock(100)) {
         lv_obj_invalidate(lv_screen_active());
         lv_refr_now(disp);
         unlock();
     }
-    epaper.setPower(false);
 }
 
 void DisplayDriver::updateUi() {

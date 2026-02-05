@@ -1,6 +1,8 @@
 #include "lvgl.h"
 #include "driver/spi_master.h"
 
+#include "estructs.h"
+
 #define DISPLAY_X 416
 #define DISPLAY_Y 240
 #define DISPLAY_B 1 // bits per pixel
@@ -17,8 +19,11 @@
 
 class BDEpaper {
     public:
+        BDEpaper();
+        ~BDEpaper() {};
+
         lv_display_t* init();
-        void setPower(bool onOff);
+        void power();
         void flush(lv_display_t *disp, const lv_area_t *area, uint8_t *color_p);
     private:
         uint8_t* rgb_buf;
@@ -45,13 +50,10 @@ class BDEpaper {
         void spiBulk(const uint8_t *data, uint32_t len);
 
         // Epaper specific
-        bool hvState;
+        PanelSettings panelSettings;
         bool pwrState;
         void panelInit();
-        void hvOn();
-        void hvOff();
         void powerOn();
-        void powerOff();
         void panelWrite(const uint8_t *data, uint32_t len);
         void panelUpdate();
 };

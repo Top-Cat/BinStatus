@@ -155,8 +155,7 @@ void ZigbeeSensor::zbCustomCommand(const esp_zb_zcl_custom_cluster_command_messa
     return;
 }
 
-void ZigbeeSensor::setBattery(uint8_t battery) {
-    uint8_t percentage = battery * 4.5;
+void ZigbeeSensor::setBattery(uint8_t battery, uint8_t percentage) {
     esp_zb_zcl_set_attribute_val(
         _endpoint,
         ESP_ZB_ZCL_CLUSTER_ID_POWER_CONFIG,

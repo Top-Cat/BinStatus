@@ -29,45 +29,71 @@ static inline uint32_t calc_buffer_size(uint16_t w, uint16_t h, uint8_t bpp) {
     return ((uint32_t)w * h * bpp + 7) / 8;
 }
 
-void BDEpaper::panelWrite(const uint8_t *data, uint32_t len) {
-    hvOn();
+BDEpaper::BDEpaper() {
+    panelSettings = {
+        .softReset = NO_SOFT_RESET,
+        .booster = BOOSTER_ON,
+        .horizontalScanDir = HSCAN_RIGHT,
+        .verticalScanDir = VSCAN_DOWN,
+        .kwr = BLACK_WHITE,
+        .lut = LUT_OTP,
+        .resolution = RESOLUTION_480x240,
 
-    spiC(0x10);
+        .vcLutz = VC_LUTZ_FLOAT_VCOM,
+        .norg = NORG_NO_EFFECT,
+        .tieg = TIEG_VGL_GND,
+        .tsAuto = TS_AUTO_NO_EFFECT,
+        .vcmz = VCMZ_NO_EFFECT,
+        .reserved = 0
+    };
+
+    buffer_size = calc_buffer_size(DISPLAY_X, DISPLAY_Y, DISPLAY_B); // 12480
+    framebuffer = (uint8_t*) malloc(buffer_size);
+    if (!framebuffer) printf("Failed to allocate framebuffer %lu\n", buffer_size);
+    memset(framebuffer, 0xFF, buffer_size);
+
+    // Allocate lvgl buffer
+    uint32_t partial_lines = 10;
+    lvgl_buf_size = DISPLAY_X * partial_lines * sizeof(uint16_t); // 8320
+    lvgl_buf = (uint8_t*) malloc(lvgl_buf_size);
+    if (!lvgl_buf) printf("Failed to allocate lvgl_buf %lu\n", lvgl_buf_size);
+    partial_render_mode = true;
+
+    // Allocate buffer for dithering
+    size_t rgb_buf_size = DISPLAY_X * DISPLAY_Y * 3; // 299,520
+    rgb_buf = (uint8_t*) malloc(rgb_buf_size);
+    if (!rgb_buf) printf("Failed to allocate rgb_buf %u\n", rgb_buf_size);
+    memset(rgb_buf, 0xFF, rgb_buf_size);
+}
+
+void BDEpaper::panelWrite(const uint8_t *data, uint32_t len) {
+    spiC(E_CMD_DATA_TRASMISSION);
     spiBulk(data, len);
 
-    spiC(0x13);
+    spiC(E_CMD_DATA_TRASMISSION_2);
     spiBulk(data, len);
 }
 
 void BDEpaper::panelUpdate() {
-    hvOn();
-
-    spiC(0x50);
-    spiD(0x97);
-
-    spiC(0x12);  // Display Refresh
-    spiD(0x00);
+    spiC(E_CMD_AUTO);
+    spiD(AUTO_SEQUENCE_PON_DRF_POF);
     wait();
 
-    hvOff();
+    spiC(E_CMD_DEEP_SLEEP);
+    wait();
+
+    gpio_set_level(HV_CTL_PIN, 0);
+    pwrState = false;
 }
 
-void BDEpaper::setPower(bool onOff) {
-    if (onOff) {
-        powerOn();
-        hvOn();
-    } else {
-        hvOff();
-        powerOff();
-    }
+void BDEpaper::power() {
+    panelInit();
 }
 
 void BDEpaper::flushDisplay() {
-    ESP_LOGI(TAG, "flushDisplay hv = %d, lv = %d", hvState, pwrState);
-    if (!hvState) return;
-
     panelWrite(framebuffer, buffer_size);
     panelUpdate();
+    ESP_LOGI(TAG, "Panel update complete");
 }
 
 void BDEpaper::flush(lv_display_t *disp, const lv_area_t *area, uint8_t *color_p) {
@@ -211,8 +237,6 @@ void BDEpaper::applyDithering() {
             }
         }
     }
-
-    ESP_LOGI(TAG, "Dithering complete");
 }
 
 esp_err_t BDEpaper::spiInit() {
@@ -300,19 +324,12 @@ void BDEpaper::panelInit() {
     vTaskDelay(pdMS_TO_TICKS(50));
     wait();
 
-    // PSR - Panel Setting
-    spiC(0x00);
-    spiD(0x1f);
-    spiD(0x0d);
+    uint16_t settingInt;
+    memcpy(&settingInt, &panelSettings, 2);
 
-    // PWR - Power Setting
-    spiC(0x01);
-    spiD(0x07);
-    spiD(0x00);
-    spiD(0x22);
-    spiD(0x78);
-    spiD(0x0A);
-    spiD(0x22);
+    spiC(E_CMD_PANEL_SETTINGS);
+    spiD(settingInt);
+    spiD(settingInt >> 8);
 
     initialized = true;
     ESP_LOGI(TAG, "Panel initialized");
@@ -405,37 +422,6 @@ void BDEpaper::spiBulk(const uint8_t *data, uint32_t len) {
     gpio_set_level(E_CS_PIN, 1);
 }
 
-void BDEpaper::hvOn() {
-    powerOn();
-
-    if (hvState) return;
-
-    spiC(0x04);
-    wait();
-    hvState = true;
-}
-
-void BDEpaper::hvOff() {
-    if (!hvState) return;
-
-    spiC(0x02);
-    wait();
-    hvState = false;
-}
-
-void BDEpaper::powerOff() {
-    hvOff();
-
-    if (!pwrState) return;
-
-    spiC(0x07); // Deep sleep
-    wait();
-
-    // Turn peripherals off
-    gpio_set_level(HV_CTL_PIN, 0);
-    pwrState = false;
-}
-
 void BDEpaper::powerOn() {
     if (pwrState) return;
 
@@ -446,24 +432,6 @@ void BDEpaper::powerOn() {
 
 lv_display_t* BDEpaper::init() {
     spiInit();
-
-    buffer_size = calc_buffer_size(DISPLAY_X, DISPLAY_Y, DISPLAY_B); // 12480
-    framebuffer = (uint8_t*) malloc(buffer_size);
-    if (!framebuffer) printf("Failed to allocate framebuffer %lu\n", buffer_size);
-    memset(framebuffer, 0xFF, buffer_size);
-
-    // Allocate lvgl buffer
-    uint32_t partial_lines = 10;
-    lvgl_buf_size = DISPLAY_X * partial_lines * sizeof(uint16_t); // 8320
-    lvgl_buf = (uint8_t*) malloc(lvgl_buf_size);
-    if (!lvgl_buf) printf("Failed to allocate lvgl_buf %lu\n", lvgl_buf_size);
-    partial_render_mode = true;
-
-    // Allocate buffer for dithering
-    size_t rgb_buf_size = DISPLAY_X * DISPLAY_Y * 3; // 299,520
-    rgb_buf = (uint8_t*) malloc(rgb_buf_size);
-    if (!rgb_buf) printf("Failed to allocate rgb_buf %u\n", rgb_buf_size);
-    memset(rgb_buf, 0xFF, rgb_buf_size);
 
     // Create LVGL display
     lv_display_t *disp = lv_display_create(DISPLAY_X, DISPLAY_Y);

@@ -6,7 +6,7 @@
 class BSADC {
     public:
         void init();
-        bool getValue(uint8_t &out);
+        bool getValue(uint8_t &out, uint8_t &percent);
     private:
         adc_oneshot_unit_handle_t adc_handle;
         adc_cali_handle_t cali_handle;

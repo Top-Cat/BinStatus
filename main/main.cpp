@@ -159,10 +159,10 @@ void handleHeartbeat() {
 
     if (heartbeatCounter % 60 == 0) {
         // Every hour
-        uint8_t zigbeeMv;
-        if (adc.getValue(zigbeeMv)) {
-            ESP_LOGV(TAG, "ADC result = %d", zigbeeMv);
-            zbEndpoint.setBattery(zigbeeMv);
+        uint8_t zigbeeMv, zigbeePercent;
+        if (adc.getValue(zigbeeMv, zigbeePercent)) {
+            ESP_LOGV(TAG, "ADC result = %d, %d", zigbeeMv, zigbeePercent);
+            zbEndpoint.setBattery(zigbeeMv, zigbeePercent);
         }
     }
 

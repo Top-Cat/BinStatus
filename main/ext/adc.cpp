@@ -37,7 +37,7 @@ void BSADC::disable() {
     gpio_set_direction(BAT_LOW_PIN, GPIO_MODE_INPUT);
 }
 
-bool BSADC::getValue(uint8_t &out) {
+bool BSADC::getValue(uint8_t &out, uint8_t &percent) {
     enable();
 
     vTaskDelay(100 / portTICK_PERIOD_MS);
@@ -46,6 +46,7 @@ bool BSADC::getValue(uint8_t &out) {
     bool res = adc_oneshot_get_calibrated_result(adc_handle, cali_handle, (adc_channel_t) BAT_ADC_PIN, &adcValue) == ESP_OK;
     if (res) {
         out = (uint8_t) ((adcValue * 3) + 50) / 100; // + 50 makes rounding correct
+        percent = (uint8_t) ((adcValue * 3) - 3500) / 3.5;
     }
 
     disable();
