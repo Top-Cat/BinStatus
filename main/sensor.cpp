@@ -146,6 +146,7 @@ void ZigbeeSensor::zbCustomCommand(const esp_zb_zcl_custom_cluster_command_messa
     prefs.putUInt(NVS_GREEN, payload.green);
     prefs.putUInt(NVS_BROWN, payload.brown);
     _on_bin_update(
+        false,
         payload.black + OneJanuary2000,
         payload.green + OneJanuary2000, 
         payload.brown + OneJanuary2000
@@ -175,7 +176,7 @@ void ZigbeeSensor::setBattery(uint8_t battery) {
     );
 }
 
-void ZigbeeSensor::onBinUpdate(void (*callback)(time_t, time_t, time_t)) {
+void ZigbeeSensor::onBinUpdate(void (*callback)(bool, time_t, time_t, time_t)) {
     _on_bin_update = callback;
 }
 
@@ -186,6 +187,7 @@ void ZigbeeSensor::init() {
     uint32_t brownBinTime = prefs.getUInt(NVS_BROWN, 0);
 
     _on_bin_update(
+        true,
         blackBinTime + OneJanuary2000,
         greenBinTime + OneJanuary2000,
         brownBinTime + OneJanuary2000

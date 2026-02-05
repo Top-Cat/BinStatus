@@ -1,13 +1,11 @@
 #include "display.h"
 
-#include "config.h"
-#include "images.h"
+#include "epaper.h"
+#include "../config.h"
+#include "../images.h"
 
 #include <algorithm>
 #include "esp_timer.h"
-
-#include "epaper.h"
-#include "epaper_lvgl.h"
 
 uint8_t daysGreen = 9;
 uint8_t daysBlack = 2;
@@ -84,47 +82,7 @@ void DisplayDriver::createUi() {
 
 void DisplayDriver::init() {
     lv_init();
-
-    epd_config_t cfg = {
-        .pins = {
-            .busy = E_BUSY_PIN,
-            .rst = E_RST_PIN,
-            .dc = E_DC_PIN,
-            .cs = E_CS_PIN,
-            .sck = E_SCL_PIN,
-            .mosi = E_SDA_PIN,
-        },
-        .spi = {
-            .host = SPI2_HOST,
-            .speed_hz = 4000000,
-        },
-        .panel = {
-            .type = EPD_PANEL_SSD16XX_370,
-            .width = 416,
-            .height = 240,
-            .mirror_x = false,
-            .mirror_y = false,
-            .rotation = 0
-        },
-    };
-
-    // Initialize e-paper
-    epd_handle_t epd;
-    ESP_ERROR_CHECK(epd_init(&cfg, &epd));
-    
-    // Initialize LVGL display with partial refresh and dithering
-    epd_lvgl_config_t lvgl_cfg = EPD_LVGL_CONFIG_DEFAULT();
-    lvgl_cfg.epd = epd;
-    lvgl_cfg.update_mode = EPD_UPDATE_FULL;
-    lvgl_cfg.use_partial_refresh = false;
-    lvgl_cfg.dither_mode = EPD_DITHER_FLOYD_STEINBERG;  // Enable grayscale dithering
-    
-    disp = epd_lvgl_init(&lvgl_cfg);
-    if (!disp) {
-        printf("Failed to init LVGL display\n");
-        epd_deinit(epd);
-        return;
-    }
+    disp = epaper.init();
 
     // Create LVGL task
     lvgl_mux = xSemaphoreCreateMutex();
@@ -140,10 +98,13 @@ void DisplayDriver::render() {
     updateUi();
     lv_timer_handler(); // Ensure screen is updated
 
+    epaper.setPower(true);
     if (lock(100)) {
-        epd_lvgl_refresh(disp);
+        lv_obj_invalidate(lv_screen_active());
+        lv_refr_now(disp);
         unlock();
     }
+    epaper.setPower(false);
 }
 
 void DisplayDriver::updateUi() {

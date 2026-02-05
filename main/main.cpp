@@ -11,9 +11,9 @@
 #include "nvs_flash.h"
 
 #include "config.h"
-#include "display.h"
+#include "ext/display.h"
 #include "sensor.h"
-#include "adc.h"
+#include "ext/adc.h"
 #include "zigbee/handlers.h"
 #include "zigbee/core.h"
 
@@ -24,8 +24,6 @@ static const char *TAG = "TC-ZB";
 static QueueHandle_t main_task_queue;
 volatile bool button_pressed = false;
 
-// TODO: Move epaper driver into project
-// TODO: Only init screen when ready to draw
 uint64_t lastHeartbeat = 0;
 uint16_t heartbeatCounter = 0;
 
@@ -42,8 +40,8 @@ void IRAM_ATTR buttonISR(void* data) {
 }
 
 static esp_err_t deferred_driver_init(void) {
-    esp_sleep_enable_ext1_wakeup(BIT(ACK_PIN), ESP_EXT1_WAKEUP_ANY_LOW);
-    gpio_wakeup_enable(ACK_PIN, GPIO_INTR_LOW_LEVEL);
+    // esp_sleep_enable_ext1_wakeup(BIT(ACK_PIN), ESP_EXT1_WAKEUP_ANY_LOW);
+    // gpio_wakeup_enable(ACK_PIN, GPIO_INTR_LOW_LEVEL);
 
     return ESP_OK;
 }
@@ -193,9 +191,9 @@ static void main_task(void *pvParameters) {
     }
 }
 
-void binUpdate(time_t black, time_t green, time_t brown) {
+void binUpdate(bool boot, time_t black, time_t green, time_t brown) {
     eink.updateTimes(black, green, brown);
-    eink.render();
+    if (!boot) eink.render();
 }
 
 static esp_err_t esp_zb_power_save_init(void)
@@ -213,13 +211,20 @@ extern "C" void app_main(void) {
     main_task_queue = xQueueCreate(4, sizeof(uint8_t));
 
     gpio_config_t gpioConfig = {
-        .pin_bit_mask = (1ULL << BUTTON_PIN),
+        .pin_bit_mask = BIT(BUTTON_PIN),
         .mode = GPIO_MODE_INPUT,
         .pull_up_en = GPIO_PULLUP_ENABLE,
         .pull_down_en = GPIO_PULLDOWN_DISABLE,
         .intr_type = GPIO_INTR_ANYEDGE
     };
     gpio_config(&gpioConfig);
+
+    gpioConfig.pin_bit_mask = BIT(HV_CTL_PIN);
+    gpioConfig.mode = GPIO_MODE_OUTPUT;
+    gpioConfig.pull_up_en = GPIO_PULLUP_DISABLE;
+    gpio_config(&gpioConfig);
+    gpio_set_level(HV_CTL_PIN, 0);
+
     adc.init();
 
     gpio_install_isr_service(0);

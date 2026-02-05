@@ -1,4 +1,4 @@
-#include "config.h"
+#include "../config.h"
 
 #include "esp_adc/adc_oneshot.h"
 #include "esp_adc/adc_cali.h"

@@ -31,7 +31,7 @@ class ZigbeeSensor : public ZigbeeDevice {
         void setBattery(uint8_t battery);
 
         void onConnect();
-        void onBinUpdate(void (*callback)(time_t, time_t, time_t));
+        void onBinUpdate(void (*callback)(bool, time_t, time_t, time_t));
         void requestOTA();
         bool report();
 
@@ -59,5 +59,5 @@ class ZigbeeSensor : public ZigbeeDevice {
         void createTimeCluster(esp_zb_cluster_list_t* cluster_list);
         void createCustomClusters(esp_zb_cluster_list_t* cluster_list);
 
-        void (*_on_bin_update)(time_t, time_t, time_t);
+        void (*_on_bin_update)(bool, time_t, time_t, time_t);
 };
