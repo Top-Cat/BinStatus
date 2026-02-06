@@ -356,7 +356,7 @@ void BDEpaper::wait(uint32_t timeout_ms) {
     }
 }
 
-void BDEpaper::spiC(uint8_t cmd) {
+void BDEpaper::spiC(PanelCommands cmd) {
     gpio_set_level(E_CS_PIN, 0);
     gpio_set_level(E_DC_PIN, 0);  // Command mode
 

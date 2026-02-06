@@ -45,7 +45,7 @@ class BDEpaper {
         esp_err_t spiInit();
         void spiR();
         void wait(uint32_t timeout_ms = 0);
-        void spiC(uint8_t cmd);
+        void spiC(PanelCommands cmd);
         void spiD(uint8_t data);
         void spiBulk(const uint8_t *data, uint32_t len);
 

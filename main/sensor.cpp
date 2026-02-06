@@ -212,7 +212,7 @@ ZigbeeSensor::ZigbeeSensor(uint8_t endpoint) : ZigbeeDevice(ESP_ZB_HA_SIMPLE_SEN
     ota_cluster_cfg = {
         .ota_upgrade_file_version = FW_VERSION,
         .ota_upgrade_manufacturer = 0x1001,
-        .ota_upgrade_image_type = 0x1011,
+        .ota_upgrade_image_type = 0x1012,
         .ota_min_block_reque = 0,
         .ota_upgrade_file_offset = 0,
         .ota_upgrade_downloaded_file_ver = ESP_ZB_ZCL_OTA_UPGRADE_DOWNLOADED_FILE_VERSION_DEF_VALUE,
